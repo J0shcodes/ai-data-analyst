@@ -59,53 +59,120 @@ export const DateRangeSchema = z.object({
     ),
 });
 
-export const ColumnProfileSchema = z.object({
-  name: z
-    .string()
-    .describe(
-      "The normalized column name. Always use this exact value — not `original_name` — when referencing this column in a tool call argument.",
+export const ColumnProfileSchema = z
+  .object({
+    name: z
+      .string()
+      .describe(
+        "The normalized column name. Always use this exact value — not `original_name` — when referencing this column in a tool call argument.",
+      ),
+    original_name: z
+      .string()
+      .describe(
+        "The column's original name as it appeared in the uploaded file, before normalization. For display/reference only — never use this in tool call arguments.",
+      ),
+    inferred_type: z
+      .enum(["numeric", "categorical", "datetime", "boolean", "text"])
+      .describe(
+        "How this column's data was classified. This determines which tools and operations are valid: only 'numerical' columns can be aggregated with sum/mean/etc. or correlated; only 'datetime' columns can be used for time-series analysis; only 'categorical' or 'boolean' columns are meaningful to group by or filter with equality checks.",
+      ),
+    missing_count: z
+      .number()
+      .int()
+      .describe(
+        "Number of rows where this column has no value. If this is large relative to the dataset's total row count, treat any aggregation over this column as based on a partial sample and consider noting that caveat in your answer.",
+      ),
+    missing_pct: z
+      .number()
+      .describe(
+        "`missing_count` expressed as a percentage of the dataset's total row count.",
+      ),
+    unique_count: z
+      .number()
+      .int()
+      .describe(
+        "The total number of distinct non-missing values in this column. This is the authoritative measure of cardinality — use it instead of counting entries in `top_values`, which is capped at 8.",
+      ),
+    numeric_stats: NumericStatsSchema.nullable().describe(
+      "Present only when `inferred_type` is 'numerical'; null for every other type.",
     ),
-  original_name: z
-    .string()
-    .describe(
-      "The column's original name as it appeared in the uploaded file, before normalization. For display/reference only — never use this in tool call arguments.",
+    categorical_summary: CategoricalSummarySchema.nullable().describe(
+      "Present only when `inferred_type` is 'categorical' or 'boolean'; null for every other type.",
     ),
-  inferred_type: z
-    .enum(["numeric", "categorical", "datetime", "boolean", "text"])
-    .describe(
-      "How this column's data was classified. This determines which tools and operations are valid: only 'numerical' columns can be aggregated with sum/mean/etc. or correlated; only 'datetime' columns can be used for time-series analysis; only 'categorical' or 'boolean' columns are meaningful to group by or filter with equality checks.",
+    date_range: DateRangeSchema.nullable().describe(
+      "Present only when `inferred_type` is 'datetime'; null for every other type.",
     ),
-  missing_count: z
-    .number()
-    .int()
-    .describe(
-      "Number of rows where this column has no value. If this is large relative to the dataset's total row count, treat any aggregation over this column as based on a partial sample and consider noting that caveat in your answer.",
-    ),
-  missing_pct: z.number(),
-  unique_count: z.number().int(),
-  numeric_stats: NumericStatsSchema.nullable(),
-  categorical_summary: CategoricalSummarySchema.nullable(),
-  date_range: DateRangeSchema.nullable(),
-});
+  })
+  .describe(
+    "A profile of a single column: its type, data-quality signals, and — depending on type — either numeric stats, a categorical value breakdown, or a date range. This is descriptive context only; it does not contain per-row data, so it cannot answer questions requiring computation on its own.",
+  );
 
-export const DatasetProfileSchema = z.object({
-  dataset_id: z.string(),
-  filename: z.string(),
-  row_count: z.number().int(),
-  column_count: z.number().int(),
-  columns: z.array(ColumnProfileSchema),
-  duplicate_row_count: z.number().int(),
-  warnings: z.array(z.string()),
-  generated_at: z.date(),
-});
+export const DatasetProfileSchema = z
+  .object({
+    dataset_id: z
+      .string()
+      .describe(
+        "The unique identifier for this dataset. Include this exact value in every tool call that operates on the dataset.",
+      ),
+    filename: z
+      .string()
+      .describe(
+        "The original filename as uploaded by the user. For display/reference only.",
+      ),
+    row_count: z
+      .number()
+      .int()
+      .describe(
+        "Total number of rows in the dataset, including rows with missing values in some columns.",
+      ),
+    column_count: z
+      .number()
+      .int()
+      .describe("Total number of columns in the dataset."),
+    columns: z
+      .array(ColumnProfileSchema)
+      .describe(
+        "A profile for every column in the dataset. When a question references a column, match it against each entry's `name` (or `original_name` if the user's wording is closer to that) before assuming the column exists — if no column matches, say so rather than guessing or substituting a similar-sounding column.",
+      ),
+    duplicate_row_count: z
+      .number()
+      .int()
+      .describe(
+        "Number of rows that are exact duplicates of another row across every column. Duplicates are reported but not removed automatically — do not assume they've been filtered out of any statistic in this profile or in a tool result.",
+      ),
+    warnings: z
+      .array(z.string())
+      .describe(
+        "Human-readable data-quality caveats about this dataset (e.g. high missingness in a column, an encoding fallback). Consider these when interpreting results and mention a relevant one in your answer if it materially affects confidence in that answer.",
+      ),
+    generated_at: z
+      .date()
+      .describe(
+        "When this profile was computed. Not typically relevant to answering questions, but indicates the profile's freshness if the dataset could have changed.",
+      ),
+  })
+  .describe(
+    "A structural and statistical summary of an uploaded dataset. This is the ONLY context you have about the dataset's contents — it contains no raw row-level data. Use it to understand what columns exist and what they look like, and to decide which analysis tool to call; it cannot itself answer questions that require filtering, grouping, aggregating, or computing anything beyond what's already summarized here.",
+  );
 
-export const DatasetPreviewSchema = z.object({
-  dataset_id: z.string(),
-  columns: z.array(z.string()),
-  rows: z
-    .array(z.record(z.string(), z.union([z.string(), z.number(), z.null()])))
-    .max(10),
-});
+export const DatasetPreviewSchema = z
+  .object({
+    dataset_id: z.string().describe("The dataset this preview belongs to."),
+    columns: z
+      .array(z.string())
+      .describe(
+        "Normalized column names, in the same order as each row's keys.",
+      ),
+    rows: z
+      .array(z.record(z.string(), z.union([z.string(), z.number(), z.null()])))
+      .max(10)
+      .describe(
+        "A capped sample of up to 10 raw rows, for human display purposes only.",
+      ),
+  })
+  .describe(
+    "A small, human-facing sample of actual rows. This is rendered in the UI for the user to visually inspect their data — it is never passed to the LLM's context, and must not be included in any prompt or tool result.",
+  );
 
 export type ValueCount = z.infer<typeof ValueCountSchema>;
 export type NumericStats = z.infer<typeof NumericStatsSchema>;
