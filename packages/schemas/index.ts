@@ -51,8 +51,8 @@ export const CategoricalSummarySchema = z
   .describe("Summary of a categorical or boolean column's value distribution.");
 
 export const DateRangeSchema = z.object({
-  min: z.date().describe("The earliest date present in this column."),
-  max: z
+  min: z.coerce.date().describe("The earliest date present in this column."),
+  max: z.coerce
     .date()
     .describe(
       "The span of dates covered by a datetime column. Use this to sanity-check whether a requested date range or time period is actually covered by the data before running a time-series analysis.",
@@ -74,7 +74,7 @@ export const ColumnProfileSchema = z
     inferred_type: z
       .enum(["numeric", "categorical", "datetime", "boolean", "text"])
       .describe(
-        "How this column's data was classified. This determines which tools and operations are valid: only 'numerical' columns can be aggregated with sum/mean/etc. or correlated; only 'datetime' columns can be used for time-series analysis; only 'categorical' or 'boolean' columns are meaningful to group by or filter with equality checks.",
+        "How this column's data was classified. This determines which tools and operations are valid: only 'numeric' columns can be aggregated with sum/mean/etc. or correlated; only 'datetime' columns can be used for time-series analysis; only 'categorical' or 'boolean' columns are meaningful to group by or filter with equality checks.",
       ),
     missing_count: z
       .number()
@@ -94,7 +94,7 @@ export const ColumnProfileSchema = z
         "The total number of distinct non-missing values in this column. This is the authoritative measure of cardinality — use it instead of counting entries in `top_values`, which is capped at 8.",
       ),
     numeric_stats: NumericStatsSchema.nullable().describe(
-      "Present only when `inferred_type` is 'numerical'; null for every other type.",
+      "Present only when `inferred_type` is 'numeric'; null for every other type.",
     ),
     categorical_summary: CategoricalSummarySchema.nullable().describe(
       "Present only when `inferred_type` is 'categorical' or 'boolean'; null for every other type.",
@@ -145,14 +145,14 @@ export const DatasetProfileSchema = z
       .describe(
         "Human-readable data-quality caveats about this dataset (e.g. high missingness in a column, an encoding fallback). Consider these when interpreting results and mention a relevant one in your answer if it materially affects confidence in that answer.",
       ),
-    generated_at: z
+    generated_at: z.coerce
       .date()
       .describe(
         "When this profile was computed. Not typically relevant to answering questions, but indicates the profile's freshness if the dataset could have changed.",
       ),
   })
   .describe(
-    "A structural and statistical summary of an uploaded dataset. This is the ONLY context you have about the dataset's contents — it contains no raw row-level data. Use it to understand what columns exist and what they look like, and to decide which analysis tool to call; it cannot itself answer questions that require filtering, grouping, aggregating, or computing anything beyond what's already summarized here.",
+    "This profile contains structural and statistical context about the dataset but no raw row-level data. Use it to understand available columns and data characteristics and to decide which analysis tool to call. For questions requiring filtering, grouping, aggregation, or other computation over rows, call the appropriate analysis tool rather than reasoning from this profile.",
   );
 
 export const DatasetPreviewSchema = z
