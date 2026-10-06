@@ -13,7 +13,7 @@ class NumericStats(BaseModel):
     max: float
     mean: float
     median: float
-    std: float
+    std: float = Field(ge=0)
 
 
 class CategoricalSummary(BaseModel):
@@ -30,9 +30,9 @@ class ColumnProfile(BaseModel):
     name: str
     original_name: str
     inferred_type: Literal["numeric", "categorical", "datetime", "boolean", "text"]
-    missing_count: int
-    missing_pct: float
-    unique_count: int
+    missing_count: int = Field(ge=0)
+    missing_pct: float = Field(ge=0, le=100)
+    unique_count: int = Field(ge=0)
     numeric_stats: NumericStats | None
     categorical_summary: CategoricalSummary | None
     date_range: DateRange | None
@@ -41,11 +41,14 @@ class ColumnProfile(BaseModel):
 class DatasetProfile(BaseModel):
     dataset_id: str
     filename: str
-    row_count: int
-    column_count: int
+    row_count: int = Field(ge=0)
+    column_count: int = Field(ge=0)
     columns: list[ColumnProfile]
-    duplicate_row_count: int
-    warnings: list[str]
+    duplicate_row_count: int = Field(ge=0)
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="High-level data health or structure warnings for the LLM",
+    )
     generated_at: datetime
 
 
