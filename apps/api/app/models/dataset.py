@@ -56,3 +56,11 @@ class DatasetPreview(BaseModel):
     dataset_id: str
     columns: list[str]
     rows: list[dict[str, str | float | int | None]] = Field(..., max_length=10)
+
+class DatasetSummary(BaseModel):
+    dataset_id: str
+    filename: str
+    row_count: int = Field(ge=0)
+    column_count: int = Field(ge=0)
+    created_at: datetime
+    last_accessed_at: datetime
